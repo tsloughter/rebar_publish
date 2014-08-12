@@ -1,0 +1,21 @@
+%% -*- erlang -*-
+{application, rebar_publish,
+ [{description, "Project_Name Example"},
+  {vsn, "0.1.0"},
+  {registered, [rebar_publish_sup]},
+  {mod, {rebar_publish_app, []}},
+  {start_phases, []},
+  {applications, [
+                 kernel
+                 ,stdlib
+                 ,sasl
+                 ,lager
+                 ,rebar
+                 ,relx
+                 ,erlware_commons
+                 ,erlcloud
+                 ,jsx
+                 ,orchestrate_client
+                 ]},
+  {env, []}
+ ]}.
