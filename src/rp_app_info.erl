@@ -3,6 +3,7 @@
 
 -export([new/0,
          new/6,
+         key/1,
          name/1,
          name/2,
          name_vsn_string/1,
@@ -31,6 +32,7 @@
 -export_type([t/0]).
 
 -record(app_info_t, {name :: atom(),
+                     key :: string(),
                      vsn :: string(),
                      dir :: file:name(),
                      link :: binary(),
@@ -76,6 +78,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
                          ,Filename]),
     Link = <<"https://s3.amazonaws.com/", (filename:join(<<"rebar_packages">>, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
+                     key=Path,
                      vsn=ParsedVsn,
                      dir=Dir,
                      link=Link,
@@ -95,6 +98,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
                          ,Filename]),
     Link = <<"https://s3.amazonaws.com/", (filename:join(<<"rebar_packages">>, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
+                     key=Path,
                      vsn=ParsedVsn,
                      dir=Dir,
                      link=Link,
@@ -117,6 +121,10 @@ name_vsn_string(AppInfo) ->
     AppName = atom_to_list(name(AppInfo)),
     AppVsn = vsn_as_string(AppInfo),
     AppName++"-"++AppVsn.
+
+-spec key(t()) -> string().
+key(#app_info_t{key=Key}) ->
+    Key.
 
 -spec vsn(t()) -> ec_semver:semver().
 vsn(#app_info_t{vsn=Vsn}) ->

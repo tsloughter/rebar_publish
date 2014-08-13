@@ -1,23 +1,26 @@
 -module(rebar_publish).
 
--export([do/1]).
+-export([update/1,
+         handle_repo/2]).
+
+-include_lib("kernel/include/file.hrl").
 
 -define(BUCKET, "rebar_packages").
--define(ACCESS_ID, "AKIAJBRG776SKWHJOAKQ").
--define(SECRET_KEY, "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").
+-define(CHUNK_SIZE, 5242880).
 
-do(Repo) ->
-    LogState = ec_cmd_log:new(debug, command_line),
-    orchestrate_client:set_apikey(<<"55d0232a-bb03-4785-996f-3d0f4070a347">>),
+update(State) ->
+    ErtsVsn = rp_state:erts_vsn(State),
+    Query = io_lib:format("erts: [0 TO ~s]", [ErtsVsn]),
 
-    S3 = erlcloud_s3:new(?ACCESS_ID, ?SECRET_KEY),
-    SystemArch = list_to_binary(erlang:system_info(system_architecture)),
-    ErtsVsn = list_to_binary(erlang:system_info(version)),
-    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
-    GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
+    {200, _Headers, {[{<<"count">>, _Count},
+                     {<<"total_count">>, _Total},
+                     {<<"results">>, Results},
+                     {<<"next">>, _}]}} = orchestrate_client:search("packages", Query),
+    lists:map(fun({X}) ->
+                      element(1, proplists:get_value(<<"value">>, X))
+              end, Results).
 
-    State = rp_state:new(LogState, ErtsVsn, SystemArch, GlibcVsnStr),
-
+handle_repo(State, Repo) ->
     % Setup directories for building
     TmpDir = ec_file:insecure_mkdtemp(),
     Dir = filename:join(TmpDir, "repo"),
@@ -26,6 +29,18 @@ do(Repo) ->
 
     % Fetch
     os:cmd("git clone " ++ Repo ++ " ."),
+
+    Tags = string:tokens(os:cmd("git tag"), "\n"),
+
+    lists:foreach(fun(Tag) ->
+                          os:cmd("git checkout -q " ++ Tag),
+                          os:cmd("git reset --hard HEAD"),
+                          handle_apps(State)
+                  end, Tags).
+
+handle_apps(State) ->
+    LogState = rp_state:log_state(State),
+    S3 = rp_state:s3(State),
 
     % Build
     os:cmd("rebar get-deps compile -r"),
@@ -37,6 +52,7 @@ do(Repo) ->
     lists:foreach(fun(App) ->
                           AppNameVsn = rp_app_info:name_vsn_string(App),
                           AppDir = rp_app_info:dir(App),
+                          Key = rp_app_info:key(App),
                           Filename = AppNameVsn++".tar.gz",
 
                           % Create Archive, pruning out deps dir and .git
@@ -49,12 +65,56 @@ do(Repo) ->
                                         ,[compressed]),
 
                           % Upload arhive
-                          {ok, Data} = file:read_file(Filename),
-                          ec_cmd_log:info(LogState, "Publishing app~n~s~n", [rp_app_info:format(1, App)]),
-                          %erlcloud_s3:put_object(?BUCKET, Path, [Data], S3),
+                          lager:info("at=publishing app=~s", [AppNameVsn]),
+                          upload(Filename, binary_to_list(Key), S3, ?BUCKET),
 
                           % Create and upload package to datastore
                           PackageJson = rp_app_info:json(App),
-                          io:format("~p~n", [PackageJson])
-                          %orchestrate_client:kv_put("packages", Path, PackageJson)
+
+                          orchestrate_client:kv_put("packages", Key, PackageJson)
                   end, Apps).
+
+-spec upload(file:name(), string(), tuple(), string()) -> ok.
+upload(Filename, Key, S3, Bucket) ->
+    case file:read_file_info(Filename) of
+        {ok, #file_info{size=Size}} when Size < 1073741824 ->
+            try
+                {ok, Data} = file:read_file(Filename),
+                erlcloud_s3:put_object(Bucket, Key, [Data], S3),
+                lager:info("at=completed_upload_to_s3 key=~s", [Key])
+            catch
+                C:T ->
+                    lager:error("at=failed_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T])
+            end;
+        _ ->
+            {ok, Fd} = file:open(Filename, [read, raw]),
+            {ok, [{uploadId, UploadId}]} = erlcloud_s3:start_multipart(Bucket
+                                                                      ,Key
+                                                                      ,[]
+                                                                      ,[]
+                                                                      ,S3),
+            try
+                Etags = upload(Fd, Key, UploadId, S3, Bucket, 1, [], file:read(Fd, ?CHUNK_SIZE)),
+                erlcloud_s3:complete_multipart(Bucket, Key, UploadId, Etags, [], S3),
+                lager:info("at=completed_upload_to_s3 key=~s", [Key])
+            catch
+                C:T ->
+                    lager:error("at=failed_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T]),
+                    erlcloud_s3:abort_multipart(Bucket, Key, UploadId, [], [], S3)
+            after
+                file:close(Fd)
+            end
+    end.
+
+upload(_Fd, _Key, _UploadId, _S3, _Bucket, _, Etags, eof) ->
+    lists:reverse(Etags);
+upload(Fd, Key, UploadId, S3, Bucket, PartNumber, Etags, {ok, Data}) ->
+    {ok, [{etag, Etag}]} = erlcloud_s3:upload_part(Bucket
+                                                  ,Key
+                                                  ,UploadId
+                                                  ,PartNumber
+                                                  ,Data
+                                                  ,[]
+                                                  ,S3),
+    upload(Fd, Key, UploadId, S3, Bucket, PartNumber+1,
+           [{PartNumber, Etag} | Etags], file:read(Fd, ?CHUNK_SIZE)).
