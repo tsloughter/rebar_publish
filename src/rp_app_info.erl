@@ -58,12 +58,12 @@ new() ->
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(rp_state:t(), atom(), string(), file:name(), [rlx_depsolver:constraint()],
-         binary()) -> {ok, t()} | relx:error().
+         binary()) -> {ok, t()} | {fail, any()}.
 new(State, AppName, Vsn, Dir, Deps, IsNative)
   when erlang:is_atom(AppName) ->
     case parse_version(Vsn) of
-        {fail, _} ->
-            ec_cmd_log:error({vsn_parse, AppName});
+        {fail, Reason} ->
+            lager:error("vsn_parse fail reason=~p", [Reason]);
         ParsedVsn ->
             new_(State, AppName, ParsedVsn, Dir, Deps, IsNative)
     end.
@@ -138,12 +138,12 @@ vsn_as_string(#app_info_t{vsn=Vsn}) ->
 vsn_as_binary(#app_info_t{vsn=Vsn}) ->
     erlang:iolist_to_binary(ec_semver:format(Vsn)).
 
--spec vsn(t(), string()) -> {ok, t()} | relx:error().
-vsn(AppInfo=#app_info_t{name=AppName}, AppVsn)
+-spec vsn(t(), string()) -> {ok, t()} | {fail, any()}.
+vsn(AppInfo=#app_info_t{}, AppVsn)
   when erlang:is_list(AppVsn) ->
     case parse_version(AppVsn) of
-        {fail, _} ->
-            ec_cmd_log:error({vsn_parse, AppName});
+        {fail, Reason} ->
+            lager:error("vsn_parse fail reason=~p", [Reason]);
         ParsedVsn ->
             {ok, AppInfo#app_info_t{vsn=ParsedVsn}}
     end.

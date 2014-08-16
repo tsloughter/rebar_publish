@@ -19,8 +19,8 @@
 %%% API
 %%%===================================================================
 
-start_link(LogState, S3) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [LogState, S3], []).
+start_link(S3, Images) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [S3, Images], []).
 
 publish(Repo) ->
     gen_server:call(?SERVER, {repo, Repo}, infinity).
@@ -32,13 +32,13 @@ update() ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init([LogState, S3]) ->
+init([S3, Images]) ->
     SystemArch = list_to_binary(erlang:system_info(system_architecture)),
     ErtsVsn = list_to_binary(erlang:system_info(version)),
     {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
     GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
 
-    State = rp_state:new(LogState, ErtsVsn, SystemArch, GlibcVsnStr, S3),
+    State = rp_state:new( ErtsVsn, SystemArch, GlibcVsnStr, S3, Images),
 
     {ok, #state{rp_state=State}}.
 

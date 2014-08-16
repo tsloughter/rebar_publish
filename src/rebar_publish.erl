@@ -40,11 +40,16 @@ handle_repo(State, Repo) ->
                   end, Tags).
 
 handle_apps(Dir, State) ->
+    lists:foreach(fun(Image) ->
+                          handle_apps(Dir, State, Image)
+                  end, rp_state:images(State)).
+
+handle_apps(Dir, State, Image) ->
     LogState = rp_state:log_state(State),
     S3 = rp_state:s3(State),
 
     % Build
-    ok = rp_docker:run_build(Dir),
+    ok = rp_docker:run_build(Dir, Image),
 
     % Collect apps to publish
     Apps = rp_app_discovery:get_apps(State, [<<"deps">>, <<"..">>]),

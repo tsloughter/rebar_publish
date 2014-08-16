@@ -11,10 +11,10 @@ get_apps(State, LibDirs) ->
                             {ok, App} ->
                                 [App | Acc];
                             {warning, W} ->
-                                ec_cmd_log:warn(rp_state:log_state(State), format_detail(W)),
+                                lager:warn(format_detail(W)),
                                 Acc;
                             {error, E} ->
-                                ec_cmd_log:error(rp_state:log_state(State), format_detail(E)),
+                                lager:error(format_detail(E)),
                                 Acc;
                             _ ->
                                 Acc

@@ -22,12 +22,12 @@ start(_StartType, _StartArgs) ->
     {ok, ApiKey} = application:get_env(rebar_publish, orchestrate_api_key),
     {ok, AccessId} = application:get_env(rebar_publish, s3_access_id),
     {ok, SecretKey} = application:get_env(rebar_publish, s3_secret_key),
+    {ok, Images} = application:get_env(rebar_publish, images),
 
-    LogState = ec_cmd_log:new(debug, command_line),
     orchestrate_client:set_apikey(ApiKey),
     S3 = erlcloud_s3:new(AccessId, SecretKey),
 
-    rebar_publish_sup:start_link(LogState, S3).
+    rebar_publish_sup:start_link(S3, Images).
 
 %%--------------------------------------------------------------------
 stop(_State) ->

@@ -22,14 +22,14 @@
 %%% API functions
 %%%===================================================================
 
-start_link(LogState, S3) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [LogState, S3]).
+start_link(S3, Images) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, [S3, Images]).
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
-init([LogState, S3]) ->
+init([S3, Images]) ->
     RestartStrategy = one_for_one,
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
@@ -37,7 +37,7 @@ init([LogState, S3]) ->
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
     {ok, {SupFlags, [{rebar_publish_server
-                     ,{rebar_publish_server, start_link, [LogState, S3]}
+                     ,{rebar_publish_server, start_link, [S3, Images]}
                      ,permanent, brutal_kill, worker, [rebar_publish_server]}]}}.
 
 %%%===================================================================
