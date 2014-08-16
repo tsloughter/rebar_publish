@@ -71,11 +71,12 @@ new(State, AppName, Vsn, Dir, Deps, IsNative)
 new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
     BucketName = rp_state:bucket(State),
     ErtsVsn = rp_state:erts_vsn(State),
-    Filename = atom_to_list(AppName)++".tar.gz",
+    VsnStr = ec_semver:format(ParsedVsn),
+    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
     Path = filename:join(["generic"
                          ,ErtsVsn
                          ,AppName
-                         ,ec_semver:format(ParsedVsn)
+                         ,VsnStr
                          ,Filename]),
     Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
@@ -92,11 +93,12 @@ new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
     SystemArch = rp_state:system_arch(State),
     Glibc = rp_state:glibc(State),
     Arch = filename:join(SystemArch, Glibc),
-    Filename = atom_to_list(AppName)++".tar.gz",
+    VsnStr = ec_semver:format(ParsedVsn),
+    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
     Path = filename:join([Arch
                          ,ErtsVsn
                          ,AppName
-                         ,ec_semver:format(ParsedVsn)
+                         ,VsnStr
                          ,Filename]),
     Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
