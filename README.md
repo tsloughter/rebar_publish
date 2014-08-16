@@ -16,9 +16,12 @@ Given a repo url this tool builds apps for every git tag in the repo and publish
             ,{docker_http, <<"http://localhost:32133">>}
             ]},
 
- {rebar_publish, [{s3_access_id, ""}
+{rebar_publish, [{s3_bucket, <<"rebar_packages"}
+                ,{s3_access_id, ""}
                 ,{s3_secret_key, ""}
+
                 ,{orchestrate_api_key, <<"">>}
+                ,{orchestrate_collection, <<"packages">>}
 
                 ,{images, [{<<"tsloughter">>, <<"erlang">>, <<"17.1">>}]}]
  }
