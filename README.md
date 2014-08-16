@@ -7,6 +7,8 @@ Given a repo url this tool builds apps for every git tag in the repo and publish
 * [Docker](http://www.docker.io)
 * [Orchestrate](http://orchestrate.io/) account
 * [AWS S3](http://aws.amazon.com/s3/) or compatible account
+* [Rebar](https://github.com/rebar/rebar/releases) in you path
+* [Relx](https://github.com/erlware/relx/releases) in your path
 
 ### Configure
 
@@ -29,7 +31,8 @@ Given a repo url this tool builds apps for every git tag in the repo and publish
 ### Build Release
 
 ```erlang
-$ make
+$ rebar get-deps compile -r
+$ relx
 $ _rel/rebar_publish/bin/rebar_publish console
 ```
 
