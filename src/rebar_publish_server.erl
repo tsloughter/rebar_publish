@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2
+-export([start_link/1
         ,publish/1
         ,update/0]).
 
@@ -19,8 +19,8 @@
 %%% API
 %%%===================================================================
 
-start_link(S3, Images) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [S3, Images], []).
+start_link(RPState) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [RPState], []).
 
 publish(Repo) ->
     gen_server:call(?SERVER, {repo, Repo}, infinity).
@@ -32,15 +32,8 @@ update() ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init([S3, Images]) ->
-    SystemArch = list_to_binary(erlang:system_info(system_architecture)),
-    ErtsVsn = list_to_binary(erlang:system_info(version)),
-    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
-    GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
-
-    State = rp_state:new( ErtsVsn, SystemArch, GlibcVsnStr, S3, Images),
-
-    {ok, #state{rp_state=State}}.
+init([RPState]) ->
+    {ok, #state{rp_state=RPState}}.
 
 handle_call({repo, Repo}, From, State=#state{rp_state=RPState}) ->
     proc_lib:spawn_link(fun() ->

@@ -11,7 +11,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/2]).
+-export([start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -22,14 +22,14 @@
 %%% API functions
 %%%===================================================================
 
-start_link(S3, Images) ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, [S3, Images]).
+start_link(RPState) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, [RPState]).
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
-init([S3, Images]) ->
+init([RPState]) ->
     RestartStrategy = one_for_one,
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
@@ -37,7 +37,7 @@ init([S3, Images]) ->
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
     {ok, {SupFlags, [{rebar_publish_server
-                     ,{rebar_publish_server, start_link, [S3, Images]}
+                     ,{rebar_publish_server, start_link, [RPState]}
                      ,permanent, brutal_kill, worker, [rebar_publish_server]}]}}.
 
 %%%===================================================================

@@ -19,15 +19,7 @@
 %%%===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, ApiKey} = application:get_env(rebar_publish, orchestrate_api_key),
-    {ok, AccessId} = application:get_env(rebar_publish, s3_access_id),
-    {ok, SecretKey} = application:get_env(rebar_publish, s3_secret_key),
-    {ok, Images} = application:get_env(rebar_publish, images),
-
-    orchestrate_client:set_apikey(ApiKey),
-    S3 = erlcloud_s3:new(AccessId, SecretKey),
-
-    rebar_publish_sup:start_link(S3, Images).
+    rebar_publish_sup:start_link(state()).
 
 %%--------------------------------------------------------------------
 stop(_State) ->
@@ -36,3 +28,21 @@ stop(_State) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+state() ->
+    SystemArch = list_to_binary(erlang:system_info(system_architecture)),
+    ErtsVsn = list_to_binary(erlang:system_info(version)),
+    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
+    GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
+
+    {ok, ApiKey} = application:get_env(rebar_publish, orchestrate_api_key),
+    {ok, Collection} = application:get_env(rebar_publish, orchestrate_collection),
+    {ok, AccessId} = application:get_env(rebar_publish, s3_access_id),
+    {ok, SecretKey} = application:get_env(rebar_publish, s3_secret_key),
+    {ok, Bucket} = application:get_env(rebar_publish, s3_bucket),
+    {ok, Images} = application:get_env(rebar_publish, images),
+
+    orchestrate_client:set_apikey(ApiKey),
+    S3 = erlcloud_s3:new(AccessId, SecretKey),
+
+    rp_state:new(ErtsVsn, SystemArch, GlibcVsnStr, S3, Images, Collection, Bucket).

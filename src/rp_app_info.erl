@@ -69,6 +69,7 @@ new(State, AppName, Vsn, Dir, Deps, IsNative)
     end.
 
 new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
+    BucketName = rp_state:bucket(State),
     ErtsVsn = rp_state:erts_vsn(State),
     Filename = atom_to_list(AppName)++".tar.gz",
     Path = filename:join(["generic"
@@ -76,7 +77,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
                          ,AppName
                          ,ec_semver:format(ParsedVsn)
                          ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(<<"rebar_packages">>, Path))/binary>>,
+    Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
                      key=Path,
                      vsn=ParsedVsn,
@@ -86,6 +87,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
                      is_native=false,
                      deps=Deps}};
 new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
+    BucketName = rp_state:bucket(State),
     ErtsVsn = rp_state:erts_vsn(State),
     SystemArch = rp_state:system_arch(State),
     Glibc = rp_state:glibc(State),
@@ -96,7 +98,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
                          ,AppName
                          ,ec_semver:format(ParsedVsn)
                          ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(<<"rebar_packages">>, Path))/binary>>,
+    Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
     {ok, #app_info_t{name=AppName,
                      key=Path,
                      vsn=ParsedVsn,

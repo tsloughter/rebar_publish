@@ -5,7 +5,6 @@
 
 -include_lib("kernel/include/file.hrl").
 
--define(BUCKET, "rebar_packages").
 -define(CHUNK_SIZE, 5242880).
 
 update(State) ->
@@ -45,7 +44,8 @@ handle_apps(Dir, State) ->
                   end, rp_state:images(State)).
 
 handle_apps(Dir, State, Image) ->
-    LogState = rp_state:log_state(State),
+    Bucket = rp_state:bucket(State),
+    Collection = rp_state:collection(State),
     S3 = rp_state:s3(State),
 
     % Build
@@ -72,12 +72,12 @@ handle_apps(Dir, State, Image) ->
 
                           % Upload arhive
                           lager:info("at=publishing app=~s", [AppNameVsn]),
-                          upload(Filename, binary_to_list(Key), S3, ?BUCKET),
+                          upload(Filename, binary_to_list(Key), S3, Bucket),
 
                           % Create and upload package to datastore
                           PackageJson = rp_app_info:json(App),
 
-                          orchestrate_client:kv_put("packages", Key, PackageJson)
+                          orchestrate_client:kv_put(Collection, Key, PackageJson)
                   end, Apps).
 
 -spec upload(file:name(), string(), tuple(), string()) -> ok.
