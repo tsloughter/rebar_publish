@@ -11,7 +11,7 @@ Given a repo url this tool builds apps for every git tag in the repo and publish
 ### Configure
 
 ```erlang
- {erldocker, [
+{erldocker, [
             {unixbridge_port, 32133}
             ,{docker_http, <<"http://localhost:32133">>}
             ]},
@@ -23,9 +23,8 @@ Given a repo url this tool builds apps for every git tag in the repo and publish
                 ,{orchestrate_api_key, <<"">>}
                 ,{orchestrate_collection, <<"packages">>}
 
-                ,{images, [{<<"tsloughter">>, <<"erlang">>, <<"17.1">>}]}]
- }
- ```
+                ,{images, [{<<"tsloughter">>, <<"erlang">>, <<"17.1">>}]}]}
+```
 
 ### Build Release
 
