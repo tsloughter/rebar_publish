@@ -12,13 +12,14 @@ update(State) ->
     ErtsVsn = rp_state:erts_vsn(State),
     Query = io_lib:format("erts: [0 TO ~s]", [ErtsVsn]),
 
-    {200, _Headers, {[{<<"count">>, _Count},
-                     {<<"total_count">>, _Total},
-                     {<<"results">>, Results},
-                     {<<"next">>, _}]}} = orchestrate_client:search("packages", Query),
-    lists:map(fun({X}) ->
-                      element(1, proplists:get_value(<<"value">>, X))
-              end, Results).
+    %% {200, _Headers, {[{<<"count">>, _Count},
+    %%                  {<<"total_count">>, _Total},
+    %%                  {<<"results">>, Results},
+    %%                  {<<"next">>, _}]}} =
+        orchestrate_client:search("packages", Query).
+    %% lists:map(fun({X}) ->
+    %%                   element(1, proplists:get_value(<<"value">>, X))
+    %%           end, Results).
 
 handle_repo(State, Repo) ->
     % Setup directories for building
@@ -26,7 +27,7 @@ handle_repo(State, Repo) ->
     Dir = filename:join(TmpDir, "repo"),
     ok = file:make_dir(Dir),
     ok = file:set_cwd(Dir),
-
+    lager:info("Dir ~p~n", [Dir]),
     % Fetch
     os:cmd("git clone " ++ Repo ++ " ."),
 
@@ -35,15 +36,15 @@ handle_repo(State, Repo) ->
     lists:foreach(fun(Tag) ->
                           os:cmd("git checkout -q " ++ Tag),
                           os:cmd("git reset --hard HEAD"),
-                          handle_apps(State)
+                          handle_apps(Dir, State)
                   end, Tags).
 
-handle_apps(State) ->
+handle_apps(Dir, State) ->
     LogState = rp_state:log_state(State),
     S3 = rp_state:s3(State),
 
     % Build
-    os:cmd("rebar get-deps compile -r"),
+    ok = rp_docker:run_build(Dir),
 
     % Collect apps to publish
     Apps = rp_app_discovery:get_apps(State, [<<"deps">>, <<"..">>]),

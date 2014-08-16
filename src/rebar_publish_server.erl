@@ -44,6 +44,7 @@ init([LogState, S3]) ->
 
 handle_call({repo, Repo}, From, State=#state{rp_state=RPState}) ->
     proc_lib:spawn_link(fun() ->
+                                lager:info("Repo ~p", [Repo]),
                                 rebar_publish:handle_repo(RPState, Repo),
                                 gen_server:reply(From, ok)
                         end),

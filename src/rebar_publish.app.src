@@ -14,9 +14,9 @@
                  ,relx
                  ,erlware_commons
                  ,erlcloud
-                 ,jiffy
-                 ,jsx
+                 ,jsxn
                  ,orchestrate_client
+                 ,erldocker
                  ]},
   {env, []}
  ]}.
