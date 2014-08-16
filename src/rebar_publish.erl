@@ -26,7 +26,7 @@ handle_repo(State, Repo) ->
     Dir = filename:join(TmpDir, "repo"),
     ok = file:make_dir(Dir),
     ok = file:set_cwd(Dir),
-    lager:info("Dir ~p~n", [Dir]),
+
     % Fetch
     os:cmd("git clone " ++ Repo ++ " ."),
 
@@ -52,7 +52,7 @@ handle_apps(Dir, State, Image) ->
     ok = rp_docker:run_build(Dir, Image),
 
     % Collect apps to publish
-    Apps = rp_app_discovery:get_apps(State, [<<"deps">>, <<"..">>]),
+    Apps = rp_app_discovery:get_apps(State, [<<"deps">>, <<".">>]),
 
     % Build tarballs and upload to s3
     lists:foreach(fun(App) ->
@@ -71,7 +71,7 @@ handle_apps(Dir, State, Image) ->
                                         ,[compressed]),
 
                           % Upload arhive
-                          lager:info("at=publishing app=~s", [AppNameVsn]),
+                          lager:info("at=publishing app=~s key=~s bucket=~s", [AppNameVsn, Key, Bucket]),
                           upload(Filename, binary_to_list(Key), S3, Bucket),
 
                           % Create and upload package to datastore
@@ -90,7 +90,7 @@ upload(Filename, Key, S3, Bucket) ->
                 lager:info("at=completed_upload_to_s3 key=~s", [Key])
             catch
                 C:T ->
-                    lager:error("at=failed_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T])
+                    lager:error("at=failed_single_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T])
             end;
         _ ->
             {ok, Fd} = file:open(Filename, [read, raw]),
@@ -105,7 +105,7 @@ upload(Filename, Key, S3, Bucket) ->
                 lager:info("at=completed_upload_to_s3 key=~s", [Key])
             catch
                 C:T ->
-                    lager:error("at=failed_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T]),
+                    lager:error("at=failed_multipart_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T]),
                     erlcloud_s3:abort_multipart(Bucket, Key, UploadId, [], [], S3)
             after
                 file:close(Fd)

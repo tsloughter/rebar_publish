@@ -11,7 +11,7 @@ get_apps(State, LibDirs) ->
                             {ok, App} ->
                                 [App | Acc];
                             {warning, W} ->
-                                lager:warn(format_detail(W)),
+                                lager:error(format_detail(W)),
                                 Acc;
                             {error, E} ->
                                 lager:error(format_detail(E)),
@@ -35,6 +35,7 @@ app_files(LibDirs) ->
 app_files_paths(LibDir) ->
     %% Search for Erlang apps in the lib dir itself
     Path1 = filename:join([binary_to_list(LibDir),
+                           "ebin",
                            "*.app"]),
     %% Search for Erlang apps in subdirs of lib dir
     Path2 = filename:join([binary_to_list(LibDir),

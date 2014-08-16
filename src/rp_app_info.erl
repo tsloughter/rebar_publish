@@ -78,7 +78,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
                          ,AppName
                          ,VsnStr
                          ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
+    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
     {ok, #app_info_t{name=AppName,
                      key=Path,
                      vsn=ParsedVsn,
@@ -100,7 +100,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
                          ,AppName
                          ,VsnStr
                          ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(BucketName, Path))/binary>>,
+    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
     {ok, #app_info_t{name=AppName,
                      key=Path,
                      vsn=ParsedVsn,

@@ -18,4 +18,7 @@ VOLUME ["/opt/src/"]
 
 ENV PATH /opt/bin/:$PATH
 
+RUN groupadd docker
+RUN useradd -g docker -d /home/docker -m docker
+USER docker
 CMD cd /opt/src ; /opt/bin/rebar get-deps compile -r
