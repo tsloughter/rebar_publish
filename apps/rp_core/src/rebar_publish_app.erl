@@ -35,12 +35,12 @@ state() ->
     {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
     GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
 
-    {ok, ApiKey} = application:get_env(rebar_publish, orchestrate_api_key),
-    {ok, Collection} = application:get_env(rebar_publish, orchestrate_collection),
-    {ok, AccessId} = application:get_env(rebar_publish, s3_access_id),
-    {ok, SecretKey} = application:get_env(rebar_publish, s3_secret_key),
-    {ok, Bucket} = application:get_env(rebar_publish, s3_bucket),
-    {ok, Images} = application:get_env(rebar_publish, images),
+    {ok, ApiKey} = application:get_env(rp_core, orchestrate_api_key),
+    {ok, Collection} = application:get_env(rp_core, orchestrate_collection),
+    {ok, AccessId} = application:get_env(rp_core, s3_access_id),
+    {ok, SecretKey} = application:get_env(rp_core, s3_secret_key),
+    {ok, Bucket} = application:get_env(rp_core, s3_bucket),
+    {ok, Images} = application:get_env(rp_core, images),
 
     orchestrate_client:set_apikey(ApiKey),
     S3 = erlcloud_s3:new(AccessId, SecretKey),

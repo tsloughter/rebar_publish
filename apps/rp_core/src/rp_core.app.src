@@ -1,5 +1,5 @@
 %% -*- erlang -*-
-{application, rebar_publish,
+{application, rp_core,
  [{description, "Project_Name Example"},
   {vsn, "0.1.0"},
   {registered, [rebar_publish_sup]},
@@ -10,13 +10,11 @@
                  ,stdlib
                  ,sasl
                  ,lager
-                 ,rebar
                  ,relx
                  ,erlware_commons
                  ,erlcloud
                  ,jsxn
                  ,orchestrate_client
-                 ,erldocker
                  ]},
   {env, []}
  ]}.

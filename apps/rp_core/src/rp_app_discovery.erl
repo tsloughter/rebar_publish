@@ -169,8 +169,8 @@ get_vsn(State, AppDir, AppName, AppDetail) ->
 -spec get_deps(rp_state:t(), file:name(), atom(), string(), proplists:proplist()) ->
                       {ok, rp_app_info:t()} | {error, Reason::term()}.
 get_deps(State, AppDir, AppName, AppVsn, AppDetail) ->
-    Apps = lists:delete(kernel, lists:delete(stdlib, proplists:get_value(applications, AppDetail, []))),
-    IncludedApps = proplists:get_value(included_applications, AppDetail, []),
+    Apps = [], %lists:delete(kernel, lists:delete(stdlib, proplists:get_value(applications, AppDetail, []))),
+    IncludedApps = [], %proplists:get_value(included_applications, AppDetail, []),
 
     Constraints = case file:consult(filename:join(AppDir, "rebar.config")) of
                       {error, enoent} ->

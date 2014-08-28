@@ -1,0 +1,17 @@
+%% -*- erlang -*-
+{application, rp_web,
+ [{description, "Project_Name Example"},
+  {vsn, "0.1.0"},
+  {registered, [rp_web_sup]},
+  {mod, {rp_web_app, []}},
+  {start_phases, []},
+  {applications, [
+                 kernel
+                 ,stdlib
+                 ,sasl
+                 ,lager
+                 ,cowboy
+                 ,jsx
+                 ]},
+  {env, []}
+ ]}.

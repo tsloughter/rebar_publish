@@ -5,7 +5,7 @@
 %% API
 -export([start_link/1
         ,publish/1
-        ,update/0]).
+        ,update/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -25,8 +25,8 @@ start_link(RPState) ->
 publish(Repo) ->
     gen_server:call(?SERVER, {repo, Repo}, infinity).
 
-update() ->
-    gen_server:call(?SERVER, update).
+update(Arch, ErtsVsn, GlibcVsn) ->
+    gen_server:call(?SERVER, {update, Arch, ErtsVsn, GlibcVsn}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -42,9 +42,9 @@ handle_call({repo, Repo}, From, State=#state{rp_state=RPState}) ->
                                 gen_server:reply(From, ok)
                         end),
     {noreply, State};
-handle_call(update, From, State=#state{rp_state=RPState}) ->
+handle_call({update, Arch, ErtsVsn, GlibcVsn}, From, State=#state{rp_state=RPState}) ->
     proc_lib:spawn_link(fun() ->
-                                Packages = rebar_publish:update(RPState),
+                                Packages = rebar_publish:update(RPState, Arch, ErtsVsn, GlibcVsn),
                                 gen_server:reply(From, {ok, Packages})
                         end),
     {noreply, State}.
