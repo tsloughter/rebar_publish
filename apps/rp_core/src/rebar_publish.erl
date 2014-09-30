@@ -9,8 +9,7 @@
 
 -define(CHUNK_SIZE, 5242880).
 
-update(State, Arch, ErtsVsn, GlibcVsn) ->
-    ErtsVsn = rp_state:erts_vsn(State),
+update(_State, Arch, ErtsVsn, GlibcVsn) ->
     Query =
         io_lib:format("erts: [0 TO ~s] AND (arch: generic OR (arch: ~s AND glibc: ~s))", [ErtsVsn
                                                                                          ,Arch
@@ -47,7 +46,8 @@ handle_repo(State, Repo) ->
                           os:cmd("git checkout -q " ++ Tag),
                           os:cmd("git reset --hard HEAD"),
                           os:cmd("git clean -xdf"),
-                          handle_apps(Dir, State)
+                          upload_src(Dir, State, Tag)
+                          %handle_apps(Dir, State)
                   end, Tags).
 
 handle_apps(Dir, State) ->
@@ -55,10 +55,27 @@ handle_apps(Dir, State) ->
                           handle_apps(Dir, State, Image)
                   end, rp_state:images(State)).
 
+upload_src(Dir, State, Tag) ->
+    Bucket = rp_state:bucket(State),
+    Collection = rp_state:collection(State),
+    S3Creds = rp_state:s3(State),
+
+    SrcApps = rp_app_discovery:get_src_apps(State, [<<".">>], Tag),
+
+    % Build tarballs and upload to s3
+    lists:foreach(fun(App) ->
+                          upload_app(App, Collection, S3Creds, Bucket)
+                  end, SrcApps).
+
 handle_apps(Dir, State, Image) ->
     Bucket = rp_state:bucket(State),
     Collection = rp_state:collection(State),
     S3Creds = rp_state:s3(State),
+
+    SrcApps = rp_app_discovery:get_src_apps(State, [<<".">>]),
+
+    % Build tarballs and upload to s3
+    lists:foreach(fun(App) -> upload_app(App, Collection, S3Creds, Bucket) end, SrcApps),
 
     % Build
     ok = rp_docker:run_build(Dir, Image),
@@ -81,7 +98,7 @@ upload_app(App, Collection, S3Creds, Bucket) ->
 
     % Upload arhive
     lager:info("at=publishing app=~s key=~s bucket=~s", [AppNameVsn, Key, Bucket]),
-    ok = upload_tarball(Filename, binary_to_list(Key), S3Creds, Bucket),
+    ok = upload_tarball(Filename, Key, S3Creds, Bucket),
 
     % Create and upload package to datastore
     PackageJson = rp_app_info:json(App),

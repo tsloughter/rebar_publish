@@ -10,7 +10,6 @@
                  ,stdlib
                  ,sasl
                  ,lager
-                 ,relx
                  ,erlware_commons
                  ,erlcloud
                  ,jsxn

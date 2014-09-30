@@ -2,10 +2,14 @@
 -module(rp_app_info).
 
 -export([new/0,
-         new/6,
+         new/7,
          key/1,
          name/1,
          name/2,
+         desc/1,
+         desc/2,
+         repo/1,
+         repo/2,
          name_vsn_string/1,
          vsn/1,
          vsn/2,
@@ -34,10 +38,12 @@
 -record(app_info_t, {name :: atom(),
                      key :: string(),
                      vsn :: string(),
+                     desc :: binary(),
+                     repo = <<"">> :: binary(),
                      dir :: file:name(),
                      link :: binary(),
                      erts_vsn :: binary(),
-                     is_native :: boolean(),
+                     is_native :: native | generic | source,
                      system_arch :: binary() | undefined,
                      glibc :: binary() | undefined,
                      deps=[]:: [rlx_depsolver:constraint()]}).
@@ -58,36 +64,17 @@ new() ->
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(rp_state:t(), atom(), string(), file:name(), [rlx_depsolver:constraint()],
-         binary()) -> {ok, t()} | {fail, any()}.
-new(State, AppName, Vsn, Dir, Deps, IsNative)
+          binary(), generic | native | source) -> {ok, t()} | {fail, any()}.
+new(State, AppName, Vsn, Dir, Deps, Desc, IsNative)
   when erlang:is_atom(AppName) ->
     case parse_version(Vsn) of
         {fail, Reason} ->
             lager:error("vsn_parse fail reason=~p", [Reason]);
         ParsedVsn ->
-            new_(State, AppName, ParsedVsn, Dir, Deps, IsNative)
+            new_(State, AppName, ParsedVsn, Dir, Deps, Desc, IsNative)
     end.
 
-new_(State, AppName, ParsedVsn, Dir, Deps, false) ->
-    BucketName = rp_state:bucket(State),
-    ErtsVsn = rp_state:erts_vsn(State),
-    VsnStr = ec_semver:format(ParsedVsn),
-    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
-    Path = filename:join(["generic"
-                         ,ErtsVsn
-                         ,AppName
-                         ,VsnStr
-                         ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
-    {ok, #app_info_t{name=AppName,
-                     key=Path,
-                     vsn=ParsedVsn,
-                     dir=Dir,
-                     link=Link,
-                     erts_vsn=ErtsVsn,
-                     is_native=false,
-                     deps=Deps}};
-new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
+new_(State, AppName, ParsedVsn, Dir, Deps, Desc, native) ->
     BucketName = rp_state:bucket(State),
     ErtsVsn = rp_state:erts_vsn(State),
     SystemArch = rp_state:system_arch(State),
@@ -102,14 +89,52 @@ new_(State, AppName, ParsedVsn, Dir, Deps, true) ->
                          ,Filename]),
     Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
     {ok, #app_info_t{name=AppName,
+                     desc=Desc,
                      key=Path,
                      vsn=ParsedVsn,
                      dir=Dir,
                      link=Link,
                      erts_vsn=ErtsVsn,
-                     is_native=true,
+                     is_native=native,
                      system_arch=SystemArch,
                      glibc=Glibc,
+                     deps=Deps}};
+new_(State, AppName, ParsedVsn, Dir, Deps, Desc, generic) ->
+    BucketName = rp_state:bucket(State),
+    ErtsVsn = rp_state:erts_vsn(State),
+    VsnStr = ec_semver:format(ParsedVsn),
+    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
+    Path = filename:join(["generic"
+                         ,ErtsVsn
+                         ,AppName
+                         ,VsnStr
+                         ,Filename]),
+    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
+    {ok, #app_info_t{name=AppName,
+                     desc=Desc,
+                     key=Path,
+                     vsn=ParsedVsn,
+                     dir=Dir,
+                     link=Link,
+                     erts_vsn=ErtsVsn,
+                     is_native=generic,
+                     deps=Deps}};
+new_(State, AppName, ParsedVsn, Dir, Deps, Desc, source) ->
+    BucketName = rp_state:bucket(State),
+    VsnStr = ec_semver:format(ParsedVsn),
+    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
+    Path = filename:join(["source"
+                         ,AppName
+                         ,VsnStr
+                         ,Filename]),
+    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
+    {ok, #app_info_t{name=AppName,
+                     desc=Desc,
+                     key=Path,
+                     vsn=ParsedVsn,
+                     dir=Dir,
+                     link=Link,
+                     is_native=source,
                      deps=Deps}}.
 
 -spec name(t()) -> atom().
@@ -120,6 +145,22 @@ name(#app_info_t{name=Name}) ->
 name(AppInfo=#app_info_t{}, AppName)
   when erlang:is_atom(AppName) ->
     AppInfo#app_info_t{name=AppName}.
+
+-spec desc(t()) -> binary().
+desc(#app_info_t{desc=Desc}) ->
+    Desc.
+
+-spec desc(t(), binary()) -> t().
+desc(AppInfo=#app_info_t{}, Desc) ->
+    AppInfo#app_info_t{desc=Desc}.
+
+-spec repo(t()) -> binary().
+repo(#app_info_t{repo=Repo}) ->
+    Repo.
+
+-spec repo(t(), binary()) -> t().
+repo(AppInfo=#app_info_t{}, Repo) ->
+    AppInfo#app_info_t{repo=Repo}.
 
 name_vsn_string(AppInfo) ->
     AppName = atom_to_list(name(AppInfo)),
@@ -203,17 +244,22 @@ format_error({vsn_parse, AppName}) ->
                   [AppName]).
 
 -spec json(t()) -> binary().
-json(AppInfo=#app_info_t{}) ->
+json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native}) ->
     jsx:encode([{name, name(AppInfo)}
                ,{vsn, vsn_as_binary(AppInfo)}
-               ,{erts, erts_vsn(AppInfo)}
+               ,{desc, Desc}
+               ,{repo, Repo}
                ,{link, dl_link(AppInfo)}
                ,{deps, deps(AppInfo)} |
-               case is_native(AppInfo) of
-                   false ->
-                       [{arch, <<"generic">>}];
-                   true ->
+               case Native of
+                   source ->
+                       [{arch, <<"source">>}];
+                   generic ->
+                       [{arch, <<"generic">>}
+                       ,{erts, erts_vsn(AppInfo)}];
+                   native ->
                        [{system_arch, system_arch(AppInfo)}
+                       ,{erts, erts_vsn(AppInfo)}
                        ,{glibc, glibc(AppInfo)}]
                end]).
 

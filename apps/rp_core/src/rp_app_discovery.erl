@@ -2,6 +2,7 @@
 -module(rp_app_discovery).
 
 -export([get_apps/2
+        ,get_src_apps/3
         ,format_detail/1]).
 
 -spec get_apps(rp_state:t(), list(binary())) -> {ok, list(rp_app_info:t())}.
@@ -21,10 +22,42 @@ get_apps(State, LibDirs) ->
                         end
                 end, [], app_files(LibDirs)).
 
+-spec get_src_apps(rp_state:t(), list(binary()), binary()) -> {ok, list(rp_app_info:t())}.
+get_src_apps(State, LibDirs, Tag) ->
+    lists:foldl(fun(AppFile, Acc) ->
+                        case is_valid_otp_app(State, AppFile) of
+                            {ok, App} ->
+                                [App | Acc];
+                            _ ->
+                                case is_valid_src_app(State, AppFile, Tag) of
+                                    {ok, App} ->
+                                        [App | Acc];
+                                    {warning, W} ->
+                                        lager:error(format_detail(W)),
+                                        Acc;
+                                    {error, E} ->
+                                        lager:error(format_detail(E)),
+                                        Acc;
+                                    _ ->
+                                        Acc
+                                end
+                        end
+                end, [], src_app_files(LibDirs)++app_files(LibDirs)).
+
 -spec app_files(list(binary())) -> list(binary()).
 app_files(LibDirs) ->
     lists:foldl(fun(LibDir, Acc) ->
                         Files = app_files_paths(LibDir),
+                        BinFiles = lists:map(fun(F) ->
+                                                     list_to_binary(F)
+                                             end, Files),
+                        Acc ++ BinFiles
+                end, [], LibDirs).
+
+-spec src_app_files(list(binary())) -> list(binary()).
+src_app_files(LibDirs) ->
+    lists:foldl(fun(LibDir, Acc) ->
+                        Files = src_app_files_paths(LibDir),
                         BinFiles = lists:map(fun(F) ->
                                                      list_to_binary(F)
                                              end, Files),
@@ -42,6 +75,22 @@ app_files_paths(LibDir) ->
                            "*",
                            "ebin",
                            "*.app"]),
+    lists:foldl(fun(Path, Acc) ->
+                        Files = filelib:wildcard(Path),
+                        Files ++ Acc
+                end, [], [Path1, Path2]).
+
+-spec src_app_files_paths(binary()) -> list(string()).
+src_app_files_paths(LibDir) ->
+    %% Search for Erlang apps in the lib dir itself
+    Path1 = filename:join([binary_to_list(LibDir),
+                           "src",
+                           "*.app.src"]),
+    %% Search for Erlang apps in subdirs of lib dir
+    Path2 = filename:join([binary_to_list(LibDir),
+                           "*",
+                           "src",
+                           "*.app.src"]),
     lists:foldl(fun(Path, Acc) ->
                         Files = filelib:wildcard(Path),
                         Files ++ Acc
@@ -88,6 +137,24 @@ is_valid_otp_app(State, File) ->
             {noresult, false}
     end.
 
+-spec is_valid_src_app(rp_state:t(), file:name(), binary()) -> {ok, rp_app_info:t()} |
+                                                               {warning, Reason::term()} |
+                                                               {error, Reason::term()} |
+                                                               {noresult, false}.
+is_valid_src_app(State, File, Tag) ->
+    %% Is this an ebin dir?
+    EbinDir = filename:dirname(File),
+    case filename:basename(EbinDir) of
+        <<"src">> ->
+            case filename:extension(File) of
+                <<".src">> ->
+                    gather_src_application_info(State, EbinDir, File, Tag);
+                _ ->
+                    {noresult, false}
+            end;
+        _ ->
+            {noresult, false}
+    end.
 
 -spec gather_application_info(rp_state:t(), file:name(), file:filename()) ->
                                      {ok, rp_app_info:t()} |
@@ -98,6 +165,29 @@ gather_application_info(State, EbinDir, File) ->
     case file:consult(File) of
         {ok, [{application, AppName, AppDetail}]} ->
             validate_application_info(State, EbinDir, File, AppName, AppDetail);
+        {error, Reason} ->
+            {warning, {unable_to_load_app, AppDir, Reason}};
+        _ ->
+            {warning, {invalid_app_file, File}}
+    end.
+
+-spec gather_src_application_info(rp_state:t(), file:name(), file:filename(), binary()) ->
+                                     {ok, rp_app_info:t()} |
+                                     {warning, Reason::term()} |
+                                     {error, Reason::term()}.
+gather_src_application_info(State, EbinDir, File, Tag) ->
+    AppDir = filename:dirname(EbinDir),
+    case file:consult(File) of
+        {ok, [{application, AppName, AppDetail}]} ->
+            AppVsn = Tag,
+            %{ok, AppVsn} = get_vsn(State, AppDir, AppName, AppDetail),
+            case get_deps(State, AppDir, AppName, AppVsn, AppDetail) of
+                {ok, Constraints} ->
+                    Desc = proplists:get_value(description, AppDetail, ""),
+                    rp_app_info:new(State, AppName, AppVsn, AppDir, Constraints, Desc, source);
+                {error, Detail} ->
+                    {error, {app_info_error, Detail}}
+            end;
         {error, Reason} ->
             {warning, {unable_to_load_app, AppDir, Reason}};
         _ ->
@@ -118,11 +208,19 @@ validate_application_info(State, EbinDir, AppFile, AppName, AppDetail) ->
         {ok, List} ->
             case has_all_beams(EbinDir, List) of
                 ok ->
-                    get_vsn(State, AppDir, AppName, AppDetail);
-                Error1 ->
-                    Error1
+                    {ok, AppVsn} = get_vsn(State, AppDir, AppName, AppDetail),
+                    case get_deps(State, AppDir, AppName, AppVsn, AppDetail) of
+                        {ok, Constraints} ->
+                            Desc = proplists:get_value(AppDetail, description, ""),
+                            rp_app_info:new(State, AppName, AppVsn, AppDir, Constraints, Desc, has_native_code(AppDir));
+                        {error, Detail} ->
+                            {error, {app_info_error, Detail}}
+                    end;
+                Error ->
+                    Error
             end;
-        Error -> Error
+        Error ->
+            Error
     end.
 
 -spec get_modules_list(file:name(), proplists:proplist()) ->
@@ -158,12 +256,7 @@ get_vsn(State, AppDir, AppName, AppDetail) ->
         undefined ->
             {error, {unversioned_app, AppDir, AppName}};
         AppVsn ->
-            case get_deps(State, AppDir, AppName, AppVsn, AppDetail) of
-                {ok, App} ->
-                    {ok, App};
-                {error, Detail} ->
-                    {error, {app_info_error, Detail}}
-            end
+            {ok, AppVsn}
     end.
 
 -spec get_deps(rp_state:t(), file:name(), atom(), string(), proplists:proplist()) ->
@@ -179,8 +272,7 @@ get_deps(State, AppDir, AppName, AppVsn, AppDetail) ->
                           Deps = proplists:get_value(deps, Terms, []),
                           constraints(Deps, Apps++IncludedApps)
                   end,
-
-    rp_app_info:new(State, AppName, AppVsn, AppDir, Constraints, has_native_code(AppDir)).
+    {ok, Constraints}.
 
 constraints(Deps, ListedApps) ->
     Constraints = lists:map(fun({Name, "", _}) ->
@@ -201,7 +293,12 @@ constraints(Deps, ListedApps) ->
 
 
 has_native_code(Dir) ->
-    filelib:is_dir(filename:join(Dir, "c_src")).
+    case filelib:is_dir(filename:join(Dir, "c_src")) of
+        true ->
+            native;
+        false ->
+            generic
+    end.
 
 %%%===================================================================
 %%% Test Functions
