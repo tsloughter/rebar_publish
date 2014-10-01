@@ -38,7 +38,7 @@
 -record(app_info_t, {name :: atom(),
                      key :: string(),
                      vsn :: string(),
-                     desc :: binary(),
+                     desc = <<"">> :: binary(),
                      repo = <<"">> :: binary(),
                      dir :: file:name(),
                      link :: binary(),

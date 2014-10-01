@@ -19,7 +19,8 @@
 %%%===================================================================
 
 start(_StartType, _StartArgs) ->
-    rebar_publish_sup:start_link(state()).
+    init_state(),
+    rebar_publish_sup:start_link().
 
 %%--------------------------------------------------------------------
 stop(_State) ->
@@ -29,12 +30,7 @@ stop(_State) ->
 %%% Internal functions
 %%%===================================================================
 
-state() ->
-    SystemArch = list_to_binary(erlang:system_info(system_architecture)),
-    ErtsVsn = list_to_binary(erlang:system_info(version)),
-    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
-    GlibcVsnStr = list_to_binary(io_lib:format("~p.~p", GlibcVsn)),
-
+init_state() ->
     {ok, ApiKey} = application:get_env(rp_core, orchestrate_api_key),
     {ok, Collection} = application:get_env(rp_core, orchestrate_collection),
     {ok, AccessId} = application:get_env(rp_core, s3_access_id),
@@ -45,4 +41,9 @@ state() ->
     orchestrate_client:set_apikey(ApiKey),
     S3 = erlcloud_s3:new(AccessId, SecretKey),
 
-    rp_state:new(ErtsVsn, SystemArch, GlibcVsnStr, S3, Images, Collection, Bucket).
+    application:set_env(rp_core, s3_creds, S3),
+    application:set_env(rp_core, collection, Collection),
+    application:set_env(rp_core, bucket, Bucket),
+    application:set_env(rp_core, images, Images),
+
+    rp_state:new(Bucket, S3, Collection, Images).

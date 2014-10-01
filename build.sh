@@ -15,7 +15,6 @@ do
     $DOCKER build -t="tsloughter/erlang:base" - <<EOF
 FROM ubuntu:14.04.1
 
-# Download and install kerl from git
 RUN apt-get update
 RUN apt-get install -y wget
 RUN apt-get install -y build-essential libncurses5-dev openssl libssl-dev fop xsltproc unixodbc-dev libglib2.0-dev git autoconf

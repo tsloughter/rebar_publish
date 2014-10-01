@@ -1,6 +1,8 @@
 -module(rebar_publish).
 
--export([update/4,
+-export([update/3,
+         handle_repo/1,
+         handle_repo/4,
          handle_repo/2]).
 
 -include_lib("erlcloud/include/erlcloud.hrl").
@@ -9,16 +11,17 @@
 
 -define(CHUNK_SIZE, 5242880).
 
-update(_State, Arch, ErtsVsn, GlibcVsn) ->
+update(Arch, ErtsVsn, GlibcVsn) ->
     Query =
-        io_lib:format("erts: [0 TO ~s] AND (arch: generic OR (arch: ~s AND glibc: ~s))", [ErtsVsn
-                                                                                         ,Arch
-                                                                                         ,GlibcVsn]),
+        io_lib:format("(erts: [0 TO ~s] AND (arch: generic OR (arch: ~s AND glibc: ~s))) OR (arch: source)",
+                      [ErtsVsn
+                      ,Arch
+                      ,GlibcVsn]),
 
 
-    {200, _Headers, [{<<"count">>, _Count}
-                    ,{<<"total_count">>, _Total}
-                    ,{<<"results">>, Results} | _]} = orchestrate_client:search("packages", Query, 0, 100),
+     {200, _Headers, [{<<"count">>, _Count}
+                     ,{<<"total_count">>, _Total}
+                     ,{<<"results">>, Results} | _]} = orchestrate_client:search("packages", Query, 0, 100),
 
     lists:foldl(fun(X, {PackageDict, GraphAcc}) ->
                         App = proplists:get_value(<<"value">>, X, []),
@@ -29,9 +32,19 @@ update(_State, Arch, ErtsVsn, GlibcVsn) ->
                         ,rlx_depsolver:add_package(GraphAcc, Name, [{Vsn, Deps}])}
                 end, {dict:new(), rlx_depsolver:new_graph()}, Results).
 
+handle_repo(Repo) ->
+    S3Creds = application:get_env(rp_core, s3_creds, erlcloud_s3:new()),
+    Collection = application:get_env(rp_core, collection, ""),
+    Bucket = application:get_env(rp_core, bucket, ""),
+    Images = application:get_env(rp_core, images, []),
+    handle_repo(rp_state:new(Bucket, S3Creds, Collection, Images), Repo).
+
+handle_repo(Bucket, S3Creds, Collection, Repo) ->
+    handle_repo(rp_state:new(Bucket, S3Creds, Collection), Repo).
 
 handle_repo(State, Repo) ->
     % Setup directories for building
+    {ok, Cwd} = file:get_cwd(),
     TmpDir = ec_file:insecure_mkdtemp(),
     Dir = filename:join(TmpDir, "repo"),
     ok = file:make_dir(Dir),
@@ -46,16 +59,17 @@ handle_repo(State, Repo) ->
                           os:cmd("git checkout -q " ++ Tag),
                           os:cmd("git reset --hard HEAD"),
                           os:cmd("git clean -xdf"),
-                          upload_src(Dir, State, Tag)
-                          %handle_apps(Dir, State)
-                  end, Tags).
+                          upload_src(State, Tag),
+                          handle_apps(Dir, State)
+                  end, Tags),
+    ok = file:set_cwd(Cwd).
 
 handle_apps(Dir, State) ->
     lists:foreach(fun(Image) ->
                           handle_apps(Dir, State, Image)
                   end, rp_state:images(State)).
 
-upload_src(Dir, State, Tag) ->
+upload_src(State, Tag) ->
     Bucket = rp_state:bucket(State),
     Collection = rp_state:collection(State),
     S3Creds = rp_state:s3(State),
@@ -157,4 +171,4 @@ upload_tarball(Fd, Key, UploadId, S3, Bucket, PartNumber, Etags, {ok, Data}) ->
                                                   ,[]
                                                   ,S3),
     upload_tarball(Fd, Key, UploadId, S3, Bucket, PartNumber+1,
-           [{PartNumber, Etag} | Etags], file:read(Fd, ?CHUNK_SIZE)).
+                   [{PartNumber, Etag} | Etags], file:read(Fd, ?CHUNK_SIZE)).

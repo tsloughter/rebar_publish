@@ -27,7 +27,7 @@ get_erlang(Req, State) ->
     {Arch, Req1} = cowboy_req:qs_val(<<"arch">>, Req),
     {ErtsVsn, Req2} = cowboy_req:qs_val(<<"erts">>, Req1),
     {GlibcVsn, Req3} = cowboy_req:qs_val(<<"glibc">>, Req2),
-    {ok, Packages} = rp:update(Arch, ErtsVsn, GlibcVsn),
+    Packages = rebar_publish:update(Arch, ErtsVsn, GlibcVsn),
     Binary = term_to_binary(Packages),
     {Binary, Req3, State}.
 

@@ -4,7 +4,7 @@
         ,update/3]).
 
 publish(Repo) ->
-    rebar_publish_server:publish(Repo).
+    rebar_publish:publish(Repo).
 
 update(Arch, ErtsVsn, GlibcVsn) ->
-    rebar_publish_server:update(Arch, ErtsVsn, GlibcVsn).
+    rebar_publish:update(Arch, ErtsVsn, GlibcVsn).

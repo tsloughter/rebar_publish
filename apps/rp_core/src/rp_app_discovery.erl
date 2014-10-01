@@ -183,7 +183,7 @@ gather_src_application_info(State, EbinDir, File, Tag) ->
             %{ok, AppVsn} = get_vsn(State, AppDir, AppName, AppDetail),
             case get_deps(State, AppDir, AppName, AppVsn, AppDetail) of
                 {ok, Constraints} ->
-                    Desc = proplists:get_value(description, AppDetail, ""),
+                    Desc = list_to_binary(proplists:get_value(description, AppDetail, "")),
                     rp_app_info:new(State, AppName, AppVsn, AppDir, Constraints, Desc, source);
                 {error, Detail} ->
                     {error, {app_info_error, Detail}}
@@ -211,7 +211,7 @@ validate_application_info(State, EbinDir, AppFile, AppName, AppDetail) ->
                     {ok, AppVsn} = get_vsn(State, AppDir, AppName, AppDetail),
                     case get_deps(State, AppDir, AppName, AppVsn, AppDetail) of
                         {ok, Constraints} ->
-                            Desc = proplists:get_value(AppDetail, description, ""),
+                            Desc = list_to_binary(proplists:get_value(AppDetail, description, "")),
                             rp_app_info:new(State, AppName, AppVsn, AppDir, Constraints, Desc, has_native_code(AppDir));
                         {error, Detail} ->
                             {error, {app_info_error, Detail}}
