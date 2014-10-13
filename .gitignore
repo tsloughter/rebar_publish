@@ -3,7 +3,6 @@ _deps
 .rebarinfo
 .eunit
 deps
-priv
 *.o
 *.beam
 *.plt

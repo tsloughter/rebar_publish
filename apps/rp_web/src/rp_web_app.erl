@@ -36,6 +36,7 @@ start_cowboy() ->
     Dispatch = cowboy_router:compile([
                                      %% {HostMatch, list({PathMatch, Handler, Opts})}
                                      {'_', [{"/packages", rp_web_update_handler, []}
+                                           ,{"/query", rp_web_search_handler, []}
                                            ,{"/static/[...]", cowboy_static,
                                             {priv_dir, rp_web, "static", [{mimetypes, cow_mimetypes, web}]}}
                                            ,{"/", rp_web_handler, [{rp_web, index}]}
