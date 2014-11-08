@@ -101,7 +101,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, Desc, native) ->
                      deps=Deps}};
 new_(State, AppName, ParsedVsn, Dir, Deps, Desc, generic) ->
     BucketName = rp_state:bucket(State),
-    ErtsVsn = rp_state:erts_vsn(State),
+    ErtsVsn = "6.2",%rp_state:erts_vsn(State),
     VsnStr = ec_semver:format(ParsedVsn),
     Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
     Path = filename:join(["generic"
@@ -245,12 +245,13 @@ format_error({vsn_parse, AppName}) ->
 
 -spec json(t()) -> binary().
 json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native}) ->
+    Deps = [dep_json(Dep) || Dep <- deps(AppInfo)],
     jsx:encode([{name, name(AppInfo)}
                ,{vsn, vsn_as_binary(AppInfo)}
                ,{desc, Desc}
                ,{repo, Repo}
                ,{link, dl_link(AppInfo)}
-               ,{deps, deps(AppInfo)} |
+               ,{deps, Deps} |
                case Native of
                    source ->
                        [{arch, <<"source">>}];
@@ -262,6 +263,9 @@ json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native}) ->
                        ,{erts, erts_vsn(AppInfo)}
                        ,{glibc, glibc(AppInfo)}]
                end]).
+
+dep_json({Name, Version}) ->
+    {atom_to_binary(Name, utf8), ec_cnv:to_binary(ec_semver:format(Version))}.
 
 -spec format(t()) -> iolist().
 format(AppInfo) ->

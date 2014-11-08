@@ -1,7 +1,6 @@
 -module(rebar_publish).
 
--export([update/3,
-         handle_repo/1,
+-export([handle_repo/1,
          handle_repo/4,
          handle_repo/2]).
 
@@ -11,29 +10,12 @@
 
 -define(CHUNK_SIZE, 5242880).
 
-update(Arch, ErtsVsn, GlibcVsn) ->
-    Query =
-        io_lib:format("(erts: [0 TO ~s] AND (arch: generic OR (arch: ~s AND glibc: ~s))) OR (arch: source)",
-                      [ErtsVsn
-                      ,Arch
-                      ,GlibcVsn]),
-
-
-     {200, _Headers, [{<<"count">>, _Count}
-                     ,{<<"total_count">>, _Total}
-                     ,{<<"results">>, Results} | _]} = orchestrate_client:search("packages", Query, 0, 100),
-
-    lists:foldl(fun(X, {PackageDict, GraphAcc}) ->
-                        App = proplists:get_value(<<"value">>, X, []),
-                        Name = proplists:get_value(<<"name">>, App, ""),
-                        Vsn = proplists:get_value(<<"vsn">>, App, ""),
-                        Deps = proplists:get_value(<<"deps">>, App, []),
-                        {dict:store({Name, Vsn}, App, PackageDict)
-                        ,rlx_depsolver:add_package(GraphAcc, Name, [{Vsn, Deps}])}
-                end, {dict:new(), rlx_depsolver:new_graph()}, Results).
-
 handle_repo(Repo) ->
-    S3Creds = application:get_env(rp_core, s3_creds, erlcloud_s3:new()),
+    {ok, AccessId} = application:get_env(rp_core, s3_access_id),
+    {ok, SecretKey} = application:get_env(rp_core, s3_secret_key),
+
+    S3Creds = application:get_env(rp_core, s3_creds, erlcloud_s3:new(AccessId, SecretKey)),
+
     Collection = application:get_env(rp_core, collection, ""),
     Bucket = application:get_env(rp_core, bucket, ""),
     Images = application:get_env(rp_core, images, []),
@@ -51,7 +33,7 @@ handle_repo(State, Repo) ->
     ok = file:set_cwd(Dir),
 
     % Fetch
-    os:cmd("git clone " ++ Repo ++ " ."),
+    sh("git clone " ++ Repo ++ " .", [use_stdout]),
 
     Tags = string:tokens(os:cmd("git tag"), "\n"),
 
@@ -59,7 +41,7 @@ handle_repo(State, Repo) ->
                           os:cmd("git checkout -q " ++ Tag),
                           os:cmd("git reset --hard HEAD"),
                           os:cmd("git clean -xdf"),
-                          upload_src(State, Tag),
+                          %upload_src(State, Tag),
                           handle_apps(Dir, State)
                   end, Tags),
     ok = file:set_cwd(Cwd).
@@ -86,19 +68,25 @@ handle_apps(Dir, State, Image) ->
     Collection = rp_state:collection(State),
     S3Creds = rp_state:s3(State),
 
-    SrcApps = rp_app_discovery:get_src_apps(State, [<<".">>]),
+    %SrcApps = rp_app_discovery:get_src_apps(State, [<<".">>]),
 
     % Build tarballs and upload to s3
-    lists:foreach(fun(App) -> upload_app(App, Collection, S3Creds, Bucket) end, SrcApps),
+    %lists:foreach(fun(App) -> upload_app(App, Collection, S3Creds, Bucket) end, SrcApps),
 
     % Build
-    ok = rp_docker:run_build(Dir, Image),
+    ok = run_build(Dir),
 
     % Collect apps to publish
-    Apps = rp_app_discovery:get_apps(State, [<<"deps">>, <<".">>]),
+    Deps = rp_app_discovery:get_apps(State, [<<"deps">>]),
+    Apps = rp_app_discovery:get_apps(State, [<<".">>]),
+
+    Deps1 = [{rp_app_info:name(App), rp_app_info:vsn(App)} || App <- Deps],
 
     % Build tarballs and upload to s3
-    lists:foreach(fun(App) -> upload_app(App, Collection, S3Creds, Bucket) end, Apps).
+    lists:foreach(fun(App) ->
+                          App1 = rp_app_info:deps(App, Deps1),
+                          upload_app(App1, Collection, S3Creds, Bucket)
+                  end, Apps).
 
 -spec upload_app(rp_app_info:t(), string(), aws_config(), string()) -> ok.
 upload_app(App, Collection, S3Creds, Bucket) ->
@@ -112,7 +100,7 @@ upload_app(App, Collection, S3Creds, Bucket) ->
 
     % Upload arhive
     lager:info("at=publishing app=~s key=~s bucket=~s", [AppNameVsn, Key, Bucket]),
-    ok = upload_tarball(Filename, Key, S3Creds, Bucket),
+    %ok = upload_tarball(Filename, Key, S3Creds, Bucket),
 
     % Create and upload package to datastore
     PackageJson = rp_app_info:json(App),
@@ -172,3 +160,61 @@ upload_tarball(Fd, Key, UploadId, S3, Bucket, PartNumber, Etags, {ok, Data}) ->
                                                   ,S3),
     upload_tarball(Fd, Key, UploadId, S3, Bucket, PartNumber+1,
                    [{PartNumber, Etag} | Etags], file:read(Fd, ?CHUNK_SIZE)).
+
+run_build(Dir) ->
+    Cwd = file:get_cwd(),
+    file:set_cwd(Dir),
+    io:format("Dir ~p~n", [Dir]),
+    sh("rebar get-deps compile", [use_stdout]),
+    file:set_cwd(Cwd),
+    ok.
+
+sh(Command, Options0) ->
+
+    Options = [expand_sh_flag(V)
+               || V <- proplists:compact(Options0)],
+
+    ErrorHandler = fun(_Command, Err) ->
+                           io:format(Err)
+                   end,
+    OutputHandler = proplists:get_value(output_handler, Options),
+
+    PortSettings = proplists:get_all_values(port_settings, Options) ++
+        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
+
+    Port = open_port({spawn, Command}, PortSettings),
+
+    case sh_loop(Port, OutputHandler, []) of
+        {ok, _Output} = Ok ->
+            Ok;
+        {error, {_Rc, _Output}=Err} ->
+            ErrorHandler(Command, Err)
+    end.
+
+expand_sh_flag(use_stdout) ->
+    {output_handler,
+     fun(Line, Acc) ->
+             io:format("~s", [Line]),
+             [Line | Acc]
+     end};
+expand_sh_flag({use_stdout, false}) ->
+    {output_handler,
+     fun(Line, Acc) ->
+             [Line | Acc]
+     end};
+expand_sh_flag({cd, _CdArg} = Cd) ->
+    {port_settings, Cd};
+expand_sh_flag({env, _EnvArg} = Env) ->
+    {port_settings, Env}.
+
+sh_loop(Port, Fun, Acc) ->
+    receive
+        {Port, {data, {eol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line ++ "\n", Acc));
+        {Port, {data, {noeol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line, Acc));
+        {Port, {exit_status, 0}} ->
+            {ok, lists:flatten(lists:reverse(Acc))};
+        {Port, {exit_status, Rc}} ->
+            {error, {Rc, lists:flatten(lists:reverse(Acc))}}
+    end.

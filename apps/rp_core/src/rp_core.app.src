@@ -15,6 +15,7 @@
                  ,jsxn
                  ,relx
                  ,orchestrate_client
+                 ,erldocker
                  ]},
   {env, []}
  ]}.
