@@ -51,18 +51,6 @@ handle_apps(Dir, State) ->
                           handle_apps(Dir, State, Image)
                   end, rp_state:images(State)).
 
-upload_src(State, Tag) ->
-    Bucket = rp_state:bucket(State),
-    Collection = rp_state:collection(State),
-    S3Creds = rp_state:s3(State),
-
-    SrcApps = rp_app_discovery:get_src_apps(State, [<<".">>], Tag),
-
-    % Build tarballs and upload to s3
-    lists:foreach(fun(App) ->
-                          upload_app(App, Collection, S3Creds, Bucket)
-                  end, SrcApps).
-
 handle_apps(Dir, State, Image) ->
     Bucket = rp_state:bucket(State),
     Collection = rp_state:collection(State),
