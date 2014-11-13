@@ -2,7 +2,6 @@
 
 -export([upload_src/2]).
 
-
 upload_src(State, Tag) ->
     Bucket = rp_state:bucket(State),
     Collection = rp_state:collection(State),
@@ -12,5 +11,5 @@ upload_src(State, Tag) ->
 
     % Build tarballs and upload to s3
     lists:foreach(fun(App) ->
-                          upload_app(App, Collection, S3Creds, Bucket)
+                          rp_upload:upload_app(App, Collection, S3Creds, Bucket)
                   end, SrcApps).

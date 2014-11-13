@@ -8,6 +8,8 @@
          name/2,
          desc/1,
          desc/2,
+         tags/1,
+         tags/2,
          repo/1,
          repo/2,
          name_vsn_string/1,
@@ -39,6 +41,7 @@
                      key :: string(),
                      vsn :: string(),
                      desc = <<"">> :: binary(),
+                     tags = [] :: [binary()],
                      repo = <<"">> :: binary(),
                      dir :: file:name(),
                      link :: binary(),
@@ -65,47 +68,16 @@ new() ->
 %% @doc build a complete version of the app info with all fields set.
 -spec new(rp_state:t(), atom(), string(), file:name(), [rlx_depsolver:constraint()],
           binary(), generic | native | source) -> {ok, t()} | {fail, any()}.
-new(State, AppName, Vsn, Dir, Deps, Desc, IsNative)
+new(State, AppName, VsnStr, Dir, Deps, Desc, IsNative)
   when erlang:is_atom(AppName) ->
-    case parse_version(Vsn) of
-        {fail, Reason} ->
-            lager:error("vsn_parse fail reason=~p", [Reason]);
-        ParsedVsn ->
-            new_(State, AppName, ParsedVsn, Dir, Deps, Desc, IsNative)
-    end.
+    new_(State, AppName, VsnStr, Dir, Deps, Desc, IsNative).
 
-new_(State, AppName, ParsedVsn, Dir, Deps, Desc, native) ->
+new_(State, AppName, VsnStr, Dir, Deps, Desc, generic) ->
     BucketName = rp_state:bucket(State),
-    ErtsVsn = rp_state:erts_vsn(State),
-    SystemArch = rp_state:system_arch(State),
-    Glibc = rp_state:glibc(State),
-    Arch = filename:join(SystemArch, Glibc),
-    VsnStr = ec_semver:format(ParsedVsn),
-    Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
-    Path = filename:join([Arch
-                         ,ErtsVsn
-                         ,AppName
-                         ,VsnStr
-                         ,Filename]),
-    Link = <<"https://s3.amazonaws.com/", (filename:join(list_to_binary(BucketName), Path))/binary>>,
-    {ok, #app_info_t{name=AppName,
-                     desc=Desc,
-                     key=Path,
-                     vsn=ParsedVsn,
-                     dir=Dir,
-                     link=Link,
-                     erts_vsn=ErtsVsn,
-                     is_native=native,
-                     system_arch=SystemArch,
-                     glibc=Glibc,
-                     deps=Deps}};
-new_(State, AppName, ParsedVsn, Dir, Deps, Desc, generic) ->
-    BucketName = rp_state:bucket(State),
-    ErtsVsn = "6.2",%rp_state:erts_vsn(State),
-    VsnStr = ec_semver:format(ParsedVsn),
+    ErtsVsn = list_to_binary(erlang:system_info(version)),
     Filename = atom_to_list(AppName)++"-"++VsnStr++".tar.gz",
     Path = filename:join(["generic"
-                         ,ErtsVsn
+                         ,binary_to_list(ErtsVsn)
                          ,AppName
                          ,VsnStr
                          ,Filename]),
@@ -113,7 +85,7 @@ new_(State, AppName, ParsedVsn, Dir, Deps, Desc, generic) ->
     {ok, #app_info_t{name=AppName,
                      desc=Desc,
                      key=Path,
-                     vsn=ParsedVsn,
+                     vsn=VsnStr,
                      dir=Dir,
                      link=Link,
                      erts_vsn=ErtsVsn,
@@ -152,7 +124,15 @@ desc(#app_info_t{desc=Desc}) ->
 
 -spec desc(t(), binary()) -> t().
 desc(AppInfo=#app_info_t{}, Desc) ->
-    AppInfo#app_info_t{desc=Desc}.
+    AppInfo#app_info_t{desc=list_to_binary(Desc)}.
+
+-spec tags(t()) -> [binary()].
+tags(#app_info_t{tags=Tags}) ->
+    Tags.
+
+-spec tags(t(), [binary()]) -> t().
+tags(AppInfo=#app_info_t{}, Tags) ->
+    AppInfo#app_info_t{tags=Tags}.
 
 -spec repo(t()) -> binary().
 repo(#app_info_t{repo=Repo}) ->
@@ -164,7 +144,7 @@ repo(AppInfo=#app_info_t{}, Repo) ->
 
 name_vsn_string(AppInfo) ->
     AppName = atom_to_list(name(AppInfo)),
-    AppVsn = vsn_as_string(AppInfo),
+    AppVsn = vsn(AppInfo),
     AppName++"-"++AppVsn.
 
 -spec key(t()) -> string().
@@ -244,11 +224,12 @@ format_error({vsn_parse, AppName}) ->
                   [AppName]).
 
 -spec json(t()) -> binary().
-json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native}) ->
+json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native, tags=Tags}) ->
     Deps = [dep_json(Dep) || Dep <- deps(AppInfo)],
     jsx:encode([{name, name(AppInfo)}
-               ,{vsn, vsn_as_binary(AppInfo)}
+               ,{vsn, list_to_binary(vsn(AppInfo))}
                ,{desc, Desc}
+               ,{tags, Tags}
                ,{repo, Repo}
                ,{link, dl_link(AppInfo)}
                ,{deps, Deps} |
@@ -265,7 +246,7 @@ json(AppInfo=#app_info_t{desc=Desc, repo=Repo, is_native=Native}) ->
                end]).
 
 dep_json({Name, Version}) ->
-    {atom_to_binary(Name, utf8), ec_cnv:to_binary(ec_semver:format(Version))}.
+    {atom_to_binary(Name, utf8), ec_cnv:to_binary(Version)}.
 
 -spec format(t()) -> iolist().
 format(AppInfo) ->
