@@ -25,14 +25,14 @@
     (render [_]
       (dom/div nil
                (dom/div #js {:className "row"}
-                        (dom/div #js {:className "col-lg-12"}
-                                 (dom/input
-                                  #js {:type "text" :ref "search" :value (:text cursor)})
-                                 (dom/button #js {:onClick #(do-search cursor owner)
-                                                  :onChange #(handle-change % owner cursor)} "Search")))
-               (apply dom/div nil
-                      (map
-                       (fn [v]
-                         (dom/div #js {:className "row"}
-                                  (dom/div #js {:className "col-lg-3"}
-                                           (dom/div nil (:name (:value v)))))) (:data cursor)))))))
+                        (dom/div #js {:className "col-lg-8 col-lg-offset-2"}
+                                 (dom/div #js {:className "list-group"}
+                                          (dom/a #js {:className "list-group-item"}
+                                                 (dom/span #js {:className "badge"}
+                                                           "http")
+                                                 (dom/span #js {:className "badge"}
+                                                           "server")
+                                                 (dom/h4 #js {:className "list-group-item-heading"}
+                                                         "Cowboy")
+                                                 (dom/p #js {:className "list-group-item-text"}
+                                                        "Small, fast, modular HTTP server written in Erlang.")))))))))

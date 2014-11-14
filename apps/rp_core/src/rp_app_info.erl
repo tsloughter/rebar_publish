@@ -168,7 +168,7 @@ vsn(AppInfo=#app_info_t{}, AppVsn)
   when erlang:is_list(AppVsn) ->
     case parse_version(AppVsn) of
         {fail, Reason} ->
-            lager:error("vsn_parse fail reason=~p", [Reason]);
+            io:format("vsn_parse fail reason=~p", [Reason]);
         ParsedVsn ->
             {ok, AppInfo#app_info_t{vsn=ParsedVsn}}
     end.

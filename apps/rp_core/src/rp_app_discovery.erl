@@ -12,10 +12,10 @@ get_apps(State, LibDirs) ->
                             {ok, App} ->
                                 [App | Acc];
                             {warning, W} ->
-                                lager:error(format_detail(W)),
+                                io:format(format_detail(W)),
                                 Acc;
                             {error, E} ->
-                                lager:error(format_detail(E)),
+                                io:format(format_detail(E)),
                                 Acc;
                             _ ->
                                 Acc
@@ -33,10 +33,10 @@ get_src_apps(State, LibDirs, Tag) ->
                                     {ok, App} ->
                                         [App | Acc];
                                     {warning, W} ->
-                                        lager:error(format_detail(W)),
+                                        io:format(format_detail(W)),
                                         Acc;
                                     {error, E} ->
-                                        lager:error(format_detail(E)),
+                                        io:format(format_detail(E)),
                                         Acc;
                                     _ ->
                                         Acc

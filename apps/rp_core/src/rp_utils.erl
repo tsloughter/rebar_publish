@@ -9,6 +9,7 @@ create_tarball(Filename, AppNameVsn, AppDir) ->
             || X <- filelib:wildcard("**", binary_to_list(AppDir))
                    ,hd(filename:split(X)) =/= "deps"
                    ,hd(filename:split(X)) =/= ".git"],
+
     erl_tar:create(Filename
                   ,Files
                   ,[compressed]).

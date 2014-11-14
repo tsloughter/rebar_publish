@@ -15,16 +15,16 @@ upload_app(App, Collection, S3Creds, Bucket) ->
     AppDir = rp_app_info:dir(App),
     Key = rp_app_info:key(App),
     Filename = AppNameVsn++".tar.gz",
+
     % Create Archive, pruning out deps dir and .git
     ok = rp_utils:create_tarball(Filename, AppNameVsn, AppDir),
-
     % Upload arhive
-    lager:info("at=publishing app=~s key=~s bucket=~s", [AppNameVsn, Key, Bucket]),
+    io:format("at=publishing app=~s key=~s bucket=~s~n", [AppNameVsn, Key, Bucket]),
     ok = rp_upload:upload_tarball(Filename, Key, S3Creds, Bucket),
 
     % Create and upload package to datastore
     PackageJson = rp_app_info:json(App),
-    lager:info("~p~n", [orchestrate_client:kv_put(Collection, Key, PackageJson)]).
+    io:format("~p~n", [orchestrate_client:kv_put(Collection, Key, PackageJson)]).
 
 -spec upload_tarball(file:name(), string(), tuple(), string()) -> ok.
 upload_tarball(Filename, Key, S3, Bucket) ->
@@ -33,10 +33,10 @@ upload_tarball(Filename, Key, S3, Bucket) ->
             try
                 {ok, Data} = file:read_file(Filename),
                 erlcloud_s3:put_object(Bucket, Key, [Data], S3),
-                lager:info("at=completed_upload_to_s3 key=~s", [Key])
+                io:format("at=completed_upload_to_s3 key=~s~n", [Key])
             catch
                 C:T ->
-                    lager:error("at=failed_single_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T])
+                    io:format("at=failed_single_upload_to_s3 key=~s error=~p reason=~p~n", [Key, C, T])
             end;
         _ ->
             {ok, Fd} = file:open(Filename, [read, raw]),
@@ -48,10 +48,10 @@ upload_tarball(Filename, Key, S3, Bucket) ->
             try
                 Etags = upload_tarball(Fd, Key, UploadId, S3, Bucket, 1, [], file:read(Fd, ?CHUNK_SIZE)),
                 erlcloud_s3:complete_multipart(Bucket, Key, UploadId, Etags, [], S3),
-                lager:info("at=completed_upload_to_s3 key=~s", [Key])
+                io:format("at=completed_upload_to_s3 key=~s", [Key])
             catch
                 C:T ->
-                    lager:error("at=failed_multipart_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T]),
+                    io:format("at=failed_multipart_upload_to_s3 key=~s error=~p reason=~p", [Key, C, T]),
                     erlcloud_s3:abort_multipart(Bucket, Key, UploadId, [], [], S3)
             after
                 file:close(Fd)
