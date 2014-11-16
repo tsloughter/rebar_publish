@@ -3,9 +3,7 @@
 -export([do/1]).
 
 do(ErtsVsn) ->
-    Query =
-        io_lib:format("(erts: [0 TO ~s] AND arch: generic",
-                      [ErtsVsn]),
+    Query = io_lib:format("erts: [0 TO ~s]", [ErtsVsn]),
 
 
     {200, _Headers, [{<<"count">>, _Count}

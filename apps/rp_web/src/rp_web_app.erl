@@ -35,12 +35,16 @@ start_cowboy() ->
 
     Dispatch = cowboy_router:compile([
                                      %% {HostMatch, list({PathMatch, Handler, Opts})}
-                                     {'_', [{"/packages", rp_web_update_handler, []}
+                                     {'_', [
+                                           {"/packages/:name/:vsn", rp_web_package_handler, []}
+                                           ,{"/packages/:name", rp_web_package_handler, []}
+                                           ,{"/packages", rp_web_package_handler, []}
                                            ,{"/query", rp_web_search_handler, []}
                                            ,{"/static/[...]", cowboy_static,
                                             {priv_dir, rp_web, "static", [{mimetypes, cow_mimetypes, web}]}}
-                                           ,{"/", rp_web_handler, [{rp_web, index}]}
+                                           ,{'_', rp_web_handler, []}
                                            ]}]),
 
     cowboy:start_http(rp_listener, 100,
-                      [{port, ListenPort}], [{env, [{dispatch, Dispatch}]}]).
+                      [{port, ListenPort}], [{compress, true}
+                                            ,{env, [{dispatch, Dispatch}]}]).

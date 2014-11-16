@@ -1,7 +1,6 @@
 -module(rp_state).
 
 -export([new/3
-        ,new/4
         ,s3/1
         ,images/1
         ,collection/1
@@ -17,13 +16,9 @@
 -opaque t() :: record(rp_state_t).
 
 new(Bucket, S3, Collection) ->
-    new(Bucket, S3, Collection, []).
-
-new(Bucket, S3, Collection, Images) ->
     #rp_state_t{s3=S3
                ,collection=Collection
-               ,bucket=Bucket
-               ,images=Images}.
+               ,bucket=Bucket}.
 
 s3(#rp_state_t{s3=S3}) ->
     S3.

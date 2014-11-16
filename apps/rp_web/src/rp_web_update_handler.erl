@@ -24,12 +24,10 @@ content_types_provided(Req, State) ->
     {[{{<<"application">>, <<"erlang">>, []}, get_erlang}], Req, State}.
 
 get_erlang(Req, State) ->
-    {Arch, Req1} = cowboy_req:qs_val(<<"arch">>, Req),
-    {ErtsVsn, Req2} = cowboy_req:qs_val(<<"erts">>, Req1),
-    {GlibcVsn, Req3} = cowboy_req:qs_val(<<"glibc">>, Req2),
-    Packages = rebar_publish:update(Arch, ErtsVsn, GlibcVsn),
+    {ErtsVsn, Req1} = cowboy_req:qs_val(<<"erts">>, Req),
+    Packages = rp:update(ErtsVsn),
     Binary = term_to_binary(Packages),
-    {Binary, Req3, State}.
+    {Binary, Req1, State}.
 
 terminate(_Reason, _Req, _State) ->
     ok.

@@ -1,3 +1,5 @@
+apps/rp_web/priv/static/js/
+target
 .rebar3
 _build
 _deps

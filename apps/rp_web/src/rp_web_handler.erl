@@ -12,23 +12,10 @@
 -export([handle/2]).
 -export([terminate/3]).
 
-init(_Transport, Req, [{Module, Function}]) ->
-    {ok, AcceptTypes, Req2} =cowboy_req:parse_header(<<"accept">>, Req,
-                                                     {<<"text">>, <<"html">>, []}),
-    case lists:keymember({<<"text">>,<<"html">>,[]}, 1, AcceptTypes) of
-        true ->
-            {ok, Req2, html};
-        false ->
-            {ok, Req2, {json, Module, Function}}
-    end.
+init(_Transport, Req, _) ->
+    {ok, Req, []}.
 
-handle(Req, State={json, Module, Function}) ->
-    {ok, Json, Req2} = Module:Function(Req),
-    {ok, Req3} = cowboy_req:reply(200, [
-                                       {<<"content-type">>, <<"application/json">>}
-                                       ], Json, Req2),
-    {ok, Req3, State};
-handle(Req, State=html) ->
+handle(Req, State) ->
     case application:get_env(rp_web, base) of
         {ok, {priv_dir, App, Path, Name}} ->
             BaseFile = filename:join([code:priv_dir(App), Path, Name]),

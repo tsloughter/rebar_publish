@@ -64,10 +64,8 @@ The app's info is also inserted to a collection in Orchestrate:
   "vsn": "0.9.0",
   "erts": "6.1",
   "link": "https://s3.amazonaws.com/rebar_packages/generic/6.1/erlydtl/0.9.0/erlydtl.tar.gz",
-  "deps": [
-      "compiler",
-      "syntax_tools"
-  ],
+  "desc": "",
+  "deps": [],
   "arch": "generic"
 }
 ```
