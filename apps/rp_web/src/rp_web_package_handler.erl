@@ -12,6 +12,7 @@
          allowed_methods/2,
          content_types_provided/2,
          get_json/2,
+         get_erlang/2,
          terminate/3]).
 
 init(_Transport, _Req, _Opts) ->
@@ -21,7 +22,14 @@ allowed_methods(Req, State) ->
     {[<<"HEAD">>, <<"GET">>], Req, State}.
 
 content_types_provided(Req, State) ->
-    {[{{<<"application">>, <<"json">>, []}, get_json}], Req, State}.
+    {[{{<<"application">>, <<"json">>, []}, get_json}
+     ,{{<<"application">>, <<"erlang">>, []}, get_erlang}], Req, State}.
+
+get_erlang(Req, State) ->
+    {ErtsVsn, Req1} = cowboy_req:qs_val(<<"erts">>, Req),
+    Packages = rp:update(ErtsVsn),
+    Binary = term_to_binary(Packages),
+    {Binary, Req1, State}.
 
 get_json(Req, State) ->
     case cowboy_req:binding(name, Req) of
